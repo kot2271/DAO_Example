@@ -3,7 +3,7 @@
 ## Задача:
     Реализовать смарт-контракт DAO по схеме
 
-    ![diagram](https://github.com/kot2271/dao_example/blob/main/schema/schema.png)
+    ![diagram](https://github.com/kot2271/DAO_Example/raw/main/schema/schema.png)
 
     Необходимо реализовать:
     - Смарт-контракт ERC-20
