@@ -3,7 +3,7 @@
 ## Задача:
     Реализовать смарт-контракт DAO по схеме
 
-    ![Schema](schema/schema.png "DAO")
+    ![schema](schema/schema.png)
 
     Необходимо реализовать:
     - Смарт-контракт ERC-20
