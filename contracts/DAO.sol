@@ -8,6 +8,13 @@ contract DAO is AccessControl {
     // Create a new role identifier for the chairperson role
     bytes32 public constant CHAIR_PERSON = keccak256("CHAIR_PERSON");
 
+    // Create an enum named VotingStatus containing possible voting status options
+    enum VotingStatus {
+        UNDEFINED,
+        ADDED,
+        FINISHED
+    }
+
     /**
      * @notice Structure for storing voting data
      */
@@ -33,17 +40,15 @@ contract DAO is AccessControl {
         // negative votes
         uint256 votesAgainst;
 
-        // vote execution flag
-        bool executed;
+        // vote execution status
+        VotingStatus status;
     }
 
     /**
      * @notice Structure for user voting data
      */
     struct UserVotingData {
-        bool hasVoted; 
         uint256 amount;
-        uint256 proposalId;
         uint256 proposalEndTime;
     }
 
@@ -63,7 +68,7 @@ contract DAO is AccessControl {
     mapping(uint256 => Proposal) public proposals;
 
     // Mapping user votes by voting
-    mapping(address => mapping(uint256 => bool)) public votes;
+    mapping(address => mapping(uint256 => bool)) public userVotes;
 
     // Mapping of active votes of users
     mapping(address => uint256) public activeProposals;
@@ -130,7 +135,7 @@ contract DAO is AccessControl {
         proposal.description = _description;
         proposal.startTime = block.timestamp;
         proposal.calldataSignature = _calldataSignature;
-        proposal.executed = false;
+        proposal.status = VotingStatus.ADDED;
 
         emit ProposalCreated(proposalsCount, _recipient, _description);
 
@@ -146,16 +151,15 @@ contract DAO is AccessControl {
 
         require(depositedTokens[msg.sender] > 0, "No voting rights");
         require(block.timestamp < proposalEndTime, "Voting period over");
-        require(!votes[msg.sender][proposalId], "Already voted");
+        require(!userVotes[msg.sender][proposalId], "Already voted");
 
-        userVotingData[msg.sender] = UserVotingData({
-            hasVoted: true,
-            amount: depositedTokens[msg.sender],
-            proposalId: proposalId,
-            proposalEndTime: proposalEndTime
-        });
+        userVotingData[msg.sender].amount = depositedTokens[msg.sender];
 
-        votes[msg.sender][proposalId] = true;
+        if (userVotingData[msg.sender].proposalEndTime < proposalEndTime) {
+            userVotingData[msg.sender].proposalEndTime = proposalEndTime;
+        }
+
+        userVotes[msg.sender][proposalId] = true;
         activeProposals[msg.sender]++;
 
         if(support) {
@@ -173,14 +177,13 @@ contract DAO is AccessControl {
     function finishProposal(uint256 proposalId) external {
         Proposal storage proposal = proposals[proposalId];
 
-        require(userVotingData[msg.sender].hasVoted, "You haven't voted yet");
         require(block.timestamp > proposal.startTime + debatePeriod, "Voting period not over yet");
-        require(!proposal.executed, "Proposal already executed");
+        require(proposal.status != VotingStatus.FINISHED, "Proposal already executed");
 
         if(proposal.votesFor > proposal.votesAgainst && (proposal.votesFor + proposal.votesAgainst) == minQuorum) {
-            proposal.executed = true;
+            proposal.status = VotingStatus.FINISHED;
 
-            votes[msg.sender][proposalId] = false;
+            userVotes[msg.sender][proposalId] = false;
             activeProposals[msg.sender]--;
 
             // Call the recipient with the calldata of the proposal
