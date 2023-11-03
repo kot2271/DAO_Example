@@ -2,13 +2,19 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract DAO {
+contract DAO is AccessControl {
+    // Create a new role identifier for the chairperson role
+    bytes32 public constant CHAIR_PERSON = keccak256("CHAIR_PERSON");
 
     /**
      * @notice Structure for storing voting data
      */
     struct Proposal {
+        // calldata signatures of the called method
+        bytes calldataSignature;
+
         //call recipient address
         address recipient;
 
@@ -31,8 +37,15 @@ contract DAO {
         bool executed;
     }
 
-    // DAO chairperson's address
-    address public chairperson;
+    /**
+     * @notice Structure for user voting data
+     */
+    struct UserVotingData {
+        bool hasVoted; 
+        uint256 amount;
+        uint256 proposalId;
+        uint256 proposalEndTime;
+    }
 
     // Voting token
     IERC20 public votingToken;
@@ -58,6 +71,9 @@ contract DAO {
     // Number of created votes
     uint256 public proposalsCount;
 
+    // Mapping for storing user voting data
+    mapping(address => UserVotingData) public userVotingData;
+
     // Events
     event Deposit(address indexed user, uint256 amount);
     event Withdraw(address indexed user, uint256 amount);
@@ -65,26 +81,20 @@ contract DAO {
     event Voted(address indexed voter, uint256 proposalId, bool support);
     event ProposalFinished(uint256 indexed proposalId);
 
-    // Modifier to verify that the call is from the chairman
-    modifier onlyChairperson() {
-        require(msg.sender == chairperson, "Only chairperson can add proposal");
-        _;
-    }
-
     // The constructor sets the basic parameters
-    constructor(address _chairperson, address _votingToken, uint256 _minQuorum, uint256 _debatePeriod) {
-        chairperson = _chairperson;
+    constructor(address chairperson, address _votingToken, uint256 _minQuorum, uint256 _debatePeriod) {
+        _grantRole(CHAIR_PERSON, chairperson);
         votingToken = IERC20(_votingToken);
         minQuorum = _minQuorum;
+        require(_debatePeriod >= 180 seconds, "The debate period can be a minimum of 180 seconds.");
         debatePeriod = _debatePeriod;
     }
 
     /**
      * @notice Voting token deposit function
      */
-    function deposit() external {
+    function deposit(uint256 amount) external {
         require(msg.sender != address(0), "Invalid address");
-        uint256 amount = votingToken.balanceOf(msg.sender);
         require(amount > 0, "Deposit some tokens first");
         require(proposalsCount > 0, "Proposal not added yet");
 
@@ -100,25 +110,27 @@ contract DAO {
     function withdraw() external {
         require(msg.sender != address(0), "Invalid address");
         require(depositedTokens[msg.sender] > 0, "No tokens to withdraw");
-
+        require(block.timestamp > userVotingData[msg.sender].proposalEndTime, "Active voting");
         require(activeProposals[msg.sender] == 0, "Cannot withdraw while voting");
 
         uint256 amount = depositedTokens[msg.sender];
         depositedTokens[msg.sender] = 0;
 
-        // результат должен быть таким => votingToken.transfer(msg.sender, amount);
-        callTransferToken(address(votingToken), msg.sender, amount);
+        require(votingToken.transfer(msg.sender, amount), "T3T token transfer failed");
         emit Withdraw(msg.sender, amount);
     }
 
     /**
      * @notice _The function to add a new vote.
      */
-    function addProposal(address _recipient, string calldata _description) external onlyChairperson {
+    function addProposal(address _recipient, string calldata _description, bytes calldata _calldataSignature) external {
+        require(hasRole(CHAIR_PERSON, msg.sender), "Caller is not a chairperson");
         Proposal storage proposal = proposals[proposalsCount];
         proposal.recipient = _recipient;
         proposal.description = _description;
         proposal.startTime = block.timestamp;
+        proposal.calldataSignature = _calldataSignature;
+        proposal.executed = false;
 
         emit ProposalCreated(proposalsCount, _recipient, _description);
 
@@ -130,10 +142,18 @@ contract DAO {
      */
     function vote(uint256 proposalId, bool support) external {
         Proposal storage proposal = proposals[proposalId];
+        uint256 proposalEndTime = proposal.startTime + debatePeriod;
 
         require(depositedTokens[msg.sender] > 0, "No voting rights");
-        require(block.timestamp < proposal.startTime + debatePeriod, "Voting period over");
+        require(block.timestamp < proposalEndTime, "Voting period over");
         require(!votes[msg.sender][proposalId], "Already voted");
+
+        userVotingData[msg.sender] = UserVotingData({
+            hasVoted: true,
+            amount: depositedTokens[msg.sender],
+            proposalId: proposalId,
+            proposalEndTime: proposalEndTime
+        });
 
         votes[msg.sender][proposalId] = true;
         activeProposals[msg.sender]++;
@@ -153,6 +173,7 @@ contract DAO {
     function finishProposal(uint256 proposalId) external {
         Proposal storage proposal = proposals[proposalId];
 
+        require(userVotingData[msg.sender].hasVoted, "You haven't voted yet");
         require(block.timestamp > proposal.startTime + debatePeriod, "Voting period not over yet");
         require(!proposal.executed, "Proposal already executed");
 
@@ -162,17 +183,11 @@ contract DAO {
             votes[msg.sender][proposalId] = false;
             activeProposals[msg.sender]--;
 
+            // Call the recipient with the calldata of the proposal
+            (bool success, ) = proposal.recipient.call(proposal.calldataSignature);
+            require(success, "Call failed");
+
             emit ProposalFinished(proposalId);
         }
-    }
-
-    /**
-     * 
-     * @notice Remote 'transfer' function call from votingToken.
-     */
-    function callTransferToken(address _token, address _to, uint256 _amount ) internal {
-        (bool success, ) = _token.call(
-            abi.encodeWithSignature("transfer(address,uint256)", _to,_amount));
-            require(success, "Token transfer failed");
     }
 }
