@@ -31,9 +31,6 @@ contract DAO is AccessControl {
         // voting start time
         uint256 startTime;
 
-        // voting duration
-        uint256 duration;
-
         // positive votes
         uint256 votesFor;
 
@@ -163,10 +160,10 @@ contract DAO is AccessControl {
         activeProposals[msg.sender]++;
 
         if(support) {
-        proposal.votesFor += depositedTokens[msg.sender];
+        proposal.votesFor ++;
         emit Voted(msg.sender, proposalId, true);
         } else {
-        proposal.votesAgainst += depositedTokens[msg.sender];
+        proposal.votesAgainst ++;
         emit Voted(msg.sender, proposalId, false);
         }
     }

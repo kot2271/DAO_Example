@@ -30,6 +30,14 @@
 
     Должна быть отдельная роль 'Chairperson', только роль 'Chairperson' может запускать функцию 'addProposal(calldata, recipient, description)'.
 
+## Installation
+
+Clone the repository using the following command:
+Install the dependencies using the following command:
+```shell
+npm i
+```
+
 ## Deployment
 
 Fill in all the required environment variables(copy .env-example to .env and fill it). 
@@ -37,4 +45,45 @@ Fill in all the required environment variables(copy .env-example to .env and fil
 Deploy contract to the chain (polygon-mumbai):
 ```shell
 npx hardhat run scripts/deploy.ts --network polygon-mumbai
+```
+
+## Verify
+
+Verify the installation by running the following command:
+```shell
+npx hardhat verify --network polygon-mumbai {TOKEN_ADDRESS} "MyToken" "T3T"
+```
+
+## Tasks
+
+Create a new task(s) and save it(them) in the folder "tasks". Add a new task_name in the file "tasks/index.ts"
+
+Running a addProposal task:
+```shell
+npx hardhat addProposal --dao {DAO_CONTRACT_ADDRESS} --recipient {RECIPIENT_ADDRESS} --description {STRING_DESCRIPTION} --network polygon-mumbai
+```
+
+Running a approve task:
+```shell
+npx hardhat approve --token {TOKEN_ADDRESS} --dao-contract {DAO_CONTRACT_ADDRESS} --amount 20 --network polygon-mumbai
+```
+
+Running a deposit task:
+```shell
+npx hardhat deposit --dao {DAO_CONTRACT_ADDRESS} --amount 20 --network polygon-mumbai
+```
+
+Running a vote task:
+```shell
+npx hardhat vote --dao {DAO_CONTRACT_ADDRESS} --proposal-id {PROPOSAL_ID} --support {"true"/"false"} --network polygon-mumbai
+```
+
+Running a finishProposal task:
+```shell
+npx hardhat finishProposal --dao {DAO_CONTRACT_ADDRESS} --proposal-id {PROPOSAL_ID} --network polygon-mumbai
+```
+
+Running a withdraw task:
+```shell
+npx hardhat withdraw --dao {DAO_CONTRACT_ADDRESS} --network polygon-mumbai
 ```

@@ -29,7 +29,7 @@ async function main() {
   const tokenSymbol = "T3T";
   const daoName = "DAO";
 
-  if (network.name === 'polygon-mumbai') {
+  // if (network.name === 'polygon-mumbai') {
 
   const Token = await ethers.getContractFactory(tokenName);
   const token = await Token.deploy(tokenName, tokenSymbol);
@@ -75,7 +75,7 @@ async function main() {
       'polygon-mumbai'
     );
   }
- }
+//  }
 }
 
 main()

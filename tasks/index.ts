@@ -1,0 +1,6 @@
+import "./addProposal"
+import "./approve"
+import "./deposit"
+import "./vote"
+import "./finishProposal"
+import "./withdraw"
