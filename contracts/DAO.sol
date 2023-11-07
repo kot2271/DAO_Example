@@ -12,7 +12,8 @@ contract DAO is AccessControl {
     enum VotingStatus {
         UNDEFINED,
         ADDED,
-        FINISHED
+        FINISHED,
+        REJECTED
     }
 
     /**
@@ -82,6 +83,7 @@ contract DAO is AccessControl {
     event ProposalCreated(uint256 indexed proposalId, address recipient, string description);
     event Voted(address indexed voter, uint256 proposalId, bool support);
     event ProposalFinished(uint256 indexed proposalId);
+    event ProposalRejected(uint256 indexed proposalId, uint256 votesFor, uint256 votesAgainst, uint256 minQuorum);
 
     // The constructor sets the basic parameters
     constructor(address chairperson, address _votingToken, uint256 _minQuorum, uint256 _debatePeriod) {
@@ -177,7 +179,7 @@ contract DAO is AccessControl {
         require(block.timestamp > proposal.startTime + debatePeriod, "Voting period not over yet");
         require(proposal.status != VotingStatus.FINISHED, "Proposal already executed");
 
-        if(proposal.votesFor > proposal.votesAgainst && (proposal.votesFor + proposal.votesAgainst) == minQuorum) {
+        if(proposal.votesFor > proposal.votesAgainst && (proposal.votesFor + proposal.votesAgainst) >= minQuorum) {
             proposal.status = VotingStatus.FINISHED;
 
             userVotes[msg.sender][proposalId] = false;
@@ -188,6 +190,9 @@ contract DAO is AccessControl {
             require(success, "Call failed");
 
             emit ProposalFinished(proposalId);
+        } else {
+            proposal.status = VotingStatus.REJECTED;
+            emit ProposalRejected(proposalId, proposal.votesFor, proposal.votesAgainst, minQuorum);
         }
     }
 }

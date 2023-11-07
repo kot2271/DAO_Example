@@ -404,7 +404,7 @@ describe("DAO", () => {
             expect(proposal.status).to.equal(2); // VotingStatus.FINISHED
         });
 
-        it("should catch error when ProposalFinished event not emitted", async () => {
+        it("should be equal proposal status VotingStatus.REJECTED", async () => {
             const description = "Proposal 1";
             await daoContract.connect(chairperson).addProposal(recipientAddress, description, calldata);
             const amount: BigNumber = ethers.utils.parseEther("100");
@@ -424,14 +424,16 @@ describe("DAO", () => {
             // startTime + 10 min
             await ethers.provider.send("evm_increaseTime", [10 * 60]);
 
-            try {
-                await expect(
-                    daoContract.connect(user1).finishProposal(0)
-                    ).to.emit(daoContract, "ProposalFinished")
-                    .withArgs(0);
-                } catch (err: any) {
-                    expect(err.message).to.equal("Expected event \"ProposalFinished\" to be emitted, but it wasn't");
-                }
+            const minQuorum: BigNumberish = 3;
+            const beforeProposal = await daoContract.proposals(0);
+
+            await expect(
+                daoContract.connect(user1).finishProposal(0)
+            ).to.emit(daoContract, "ProposalRejected")
+            .withArgs(0, beforeProposal.votesFor, beforeProposal.votesAgainst, minQuorum);
+
+            const afterProposal = await daoContract.proposals(0);
+            expect(afterProposal.status).to.be.equal(3); // VotingStatus.REJECTED
         });
     
     }); 
