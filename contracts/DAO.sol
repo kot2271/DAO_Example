@@ -22,22 +22,16 @@ contract DAO is AccessControl {
     struct Proposal {
         // calldata signatures of the called method
         bytes calldataSignature;
-
         //call recipient address
         address recipient;
-
         //voting description
         string description;
-
         // voting start time
         uint256 startTime;
-
         // positive votes
         uint256 votesFor;
-
         // negative votes
         uint256 votesAgainst;
-
         // vote execution status
         VotingStatus status;
     }
@@ -80,17 +74,34 @@ contract DAO is AccessControl {
     // Events
     event Deposit(address indexed user, uint256 amount);
     event Withdraw(address indexed user, uint256 amount);
-    event ProposalCreated(uint256 indexed proposalId, address recipient, string description);
+    event ProposalCreated(
+        uint256 indexed proposalId,
+        address recipient,
+        string description
+    );
     event Voted(address indexed voter, uint256 proposalId, bool support);
     event ProposalFinished(uint256 indexed proposalId);
-    event ProposalRejected(uint256 indexed proposalId, uint256 votesFor, uint256 votesAgainst, uint256 minQuorum);
+    event ProposalRejected(
+        uint256 indexed proposalId,
+        uint256 votesFor,
+        uint256 votesAgainst,
+        uint256 minQuorum
+    );
 
     // The constructor sets the basic parameters
-    constructor(address chairperson, address _votingToken, uint256 _minQuorum, uint256 _debatePeriod) {
+    constructor(
+        address chairperson,
+        address _votingToken,
+        uint256 _minQuorum,
+        uint256 _debatePeriod
+    ) {
         _grantRole(CHAIR_PERSON, chairperson);
         votingToken = IERC20(_votingToken);
         minQuorum = _minQuorum;
-        require(_debatePeriod >= 180 seconds, "The debate period can be a minimum of 180 seconds.");
+        require(
+            _debatePeriod >= 180 seconds,
+            "The debate period can be a minimum of 180 seconds."
+        );
         debatePeriod = _debatePeriod;
     }
 
@@ -114,21 +125,37 @@ contract DAO is AccessControl {
     function withdraw() external {
         require(msg.sender != address(0), "Invalid address");
         require(depositedTokens[msg.sender] > 0, "No tokens to withdraw");
-        require(block.timestamp > userVotingData[msg.sender].proposalEndTime, "Active voting");
-        require(activeProposals[msg.sender] == 0, "Cannot withdraw while voting");
+        require(
+            block.timestamp > userVotingData[msg.sender].proposalEndTime,
+            "Active voting"
+        );
+        require(
+            activeProposals[msg.sender] == 0,
+            "Cannot withdraw while voting"
+        );
 
         uint256 amount = depositedTokens[msg.sender];
         depositedTokens[msg.sender] = 0;
 
-        require(votingToken.transfer(msg.sender, amount), "T3T token transfer failed");
+        require(
+            votingToken.transfer(msg.sender, amount),
+            "T3T token transfer failed"
+        );
         emit Withdraw(msg.sender, amount);
     }
 
     /**
-     * @notice _The function to add a new vote.
+     * @notice The function to add a new vote.
      */
-    function addProposal(address _recipient, string calldata _description, bytes calldata _calldataSignature) external {
-        require(hasRole(CHAIR_PERSON, msg.sender), "Caller is not a chairperson");
+    function addProposal(
+        address _recipient,
+        string calldata _description,
+        bytes calldata _calldataSignature
+    ) external {
+        require(
+            hasRole(CHAIR_PERSON, msg.sender),
+            "Caller is not a chairperson"
+        );
         Proposal storage proposal = proposals[proposalsCount];
         proposal.recipient = _recipient;
         proposal.description = _description;
@@ -161,38 +188,54 @@ contract DAO is AccessControl {
         userVotes[msg.sender][proposalId] = true;
         activeProposals[msg.sender]++;
 
-        if(support) {
-        proposal.votesFor ++;
-        emit Voted(msg.sender, proposalId, true);
+        if (support) {
+            proposal.votesFor++;
+            emit Voted(msg.sender, proposalId, true);
         } else {
-        proposal.votesAgainst ++;
-        emit Voted(msg.sender, proposalId, false);
+            proposal.votesAgainst++;
+            emit Voted(msg.sender, proposalId, false);
         }
     }
 
     /**
-     * @notice A function to finalize the vote and execute the results of the vote. 
+     * @notice A function to finalize the vote and execute the results of the vote.
      */
     function finishProposal(uint256 proposalId) external {
         Proposal storage proposal = proposals[proposalId];
 
-        require(block.timestamp > proposal.startTime + debatePeriod, "Voting period not over yet");
-        require(proposal.status != VotingStatus.FINISHED, "Proposal already executed");
+        require(
+            block.timestamp > proposal.startTime + debatePeriod,
+            "Voting period not over yet"
+        );
+        require(
+            proposal.status != VotingStatus.FINISHED,
+            "Proposal already executed"
+        );
 
-        if(proposal.votesFor > proposal.votesAgainst && (proposal.votesFor + proposal.votesAgainst) >= minQuorum) {
+        if (
+            proposal.votesFor > proposal.votesAgainst &&
+            (proposal.votesFor + proposal.votesAgainst) >= minQuorum
+        ) {
             proposal.status = VotingStatus.FINISHED;
 
             userVotes[msg.sender][proposalId] = false;
             activeProposals[msg.sender]--;
 
             // Call the recipient with the calldata of the proposal
-            (bool success, ) = proposal.recipient.call(proposal.calldataSignature);
+            (bool success, ) = proposal.recipient.call(
+                proposal.calldataSignature
+            );
             require(success, "Call failed");
 
             emit ProposalFinished(proposalId);
         } else {
             proposal.status = VotingStatus.REJECTED;
-            emit ProposalRejected(proposalId, proposal.votesFor, proposal.votesAgainst, minQuorum);
+            emit ProposalRejected(
+                proposalId,
+                proposal.votesFor,
+                proposal.votesAgainst,
+                minQuorum
+            );
         }
     }
 }
